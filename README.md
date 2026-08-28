@@ -1,112 +1,123 @@
 # check_opencore_models
 
-Tools for discovering and comparing free/cheap AI models across [OpenCode](https://opencode.ai) (Zen & Go) and [OpenRouter](https://openrouter.ai).
+Tools for discovering and comparing free/cheap AI models across [OpenCode](https://opencode.ai) (Zen & Go plans) and [OpenRouter](https://openrouter.ai).
 
-## Scripts
+## Overview
 
-### `opencode_price_estimator.py`
-
-Maps models from OpenCode Zen & Go with pay-as-you-go pricing, filters cheap/free models, and estimates costs between subscription plans.
-
-**Features:**
-- Fetches models from OpenCode Zen API
-- Scrapes pricing from official docs (Zen + Go)
-- Filters models by price threshold (input/output per million tokens)
-- Estimates cost for given token usage
-- Compares Zen pay-as-you-go vs Go subscription value
-- Outputs table or JSON
-
-**Usage:**
-
-```bash
-# List all models under $2/1M tokens (default)
-python opencode_price_estimator.py
-
-# Set custom threshold
-python opencode_price_estimator.py --threshold 1.00
-
-# Filter by provider
-python opencode_price_estimator.py --provider zen
-python opencode_price_estimator.py --provider go
-
-# Show separate Zen/Go tables
-python opencode_price_estimator.py --segment
-
-# Estimate cost for 5M input + 2M output tokens
-python opencode_price_estimator.py --estimate 5000000 2000000
-
-# JSON output
-python opencode_price_estimator.py --output json
-
-# Update prices from official docs
-python opencode_price_estimator.py --update-prices
-
-# Use custom prices file
-python opencode_price_estimator.py --prices-file custom_prices.json
-```
-
-**Flags:**
-
-| Flag | Description | Default |
-|------|-------------|---------|
-| `--threshold` | Max $/1M tokens | 2.00 |
-| `--min` | Min $/1M tokens (optional) | None |
-| `--max` | Max $/1M tokens (overrides threshold) | None |
-| `--provider` | Filter: `all`, `zen`, `go` | all |
-| `--segment` | Show separate Zen/Go tables | false |
-| `--estimate` | Estimate cost: `<input_tokens> <output_tokens>` | None |
-| `--output` | Output format: `table`, `json` | table |
-| `--update-prices` | Scrape docs and update local JSON | false |
-| `--prices-file` | Path to prices JSON | `opencode_prices.json` |
-| `--go-value` | Estimated Go monthly value ($) | 60.0 |
+| Script | Provider | Purpose |
+|--------|----------|---------|
+| `opencode_price_estimator.py` | OpenCode Zen/Go | List cheap models, compare Zen vs Go plans, estimate costs |
+| `openrouter_cheap_models.py` | OpenRouter | List cheap models by category (text, embedding, transcription) |
 
 ---
 
-### `openrouter_cheap_models.py`
+## `opencode_price_estimator.py`
 
-Fetches models from OpenRouter and filters free/cheap ones, segmented by type.
+Fetches models from the OpenCode Zen API, enriches them with pricing scraped from official docs, and filters/estimates costs.
 
-**Features:**
-- Fetches text, embedding, and transcription models
-- Filters by price threshold
-- Handles audio (per-second) pricing
-- Outputs table or JSON
+**Data sources:**
+- API: `https://opencode.ai/zen/v1/models`
+- Zen docs: `https://opencode.ai/docs/zen`
+- Go docs: `https://opencode.ai/docs/go/`
+- Local cache: `opencode_prices.json`
 
-**Usage:**
+**What it does:**
+- Lists all models with input/output pricing per million tokens
+- Filters by price range (min/max)
+- Segments by provider: Zen (pay-as-you-go), Go (subscription), or both
+- Estimates cost for a given token usage (input + output)
+- Compares Zen pay-as-you-go vs Go subscription value ($10/mo, ~$60 estimated usage)
+- Scrapes and saves updated pricing to local JSON
+
+### Examples
 
 ```bash
-# List models under $0.03/1M tokens (default)
+# List all models under $2/1M tokens
+python opencode_price_estimator.py
+
+# Only free models
+python opencode_price_estimator.py --threshold 0.00
+
+# Only Zen models, max $1/1M
+python opencode_price_estimator.py --provider zen --threshold 1.00
+
+# Show Zen and Go tables separately
+python opencode_price_estimator.py --segment
+
+# Estimate cost: 5M input tokens + 2M output tokens
+python opencode_price_estimator.py --estimate 5000000 2000000
+
+# JSON output for scripting
+python opencode_price_estimator.py --output json
+
+# Refresh prices from OpenCode docs
+python opencode_price_estimator.py --update-prices
+```
+
+### Flags
+
+| Flag | Description | Default |
+|------|-------------|---------|
+| `--threshold` | Max price ($/1M tokens) | `2.00` |
+| `--min` | Min price ($/1M tokens) | — |
+| `--max` | Max price ($/1M tokens, overrides `--threshold`) | — |
+| `--provider` | Filter: `all`, `zen`, `go` | `all` |
+| `--segment` | Show separate Zen/Go tables | `false` |
+| `--estimate` | Cost estimate: `<input_tokens> <output_tokens>` | — |
+| `--output` | Format: `table`, `json` | `table` |
+| `--update-prices` | Scrape docs and update `opencode_prices.json` | `false` |
+| `--prices-file` | Custom prices JSON path | `opencode_prices.json` |
+| `--go-value` | Estimated Go monthly usage value ($) | `60.0` |
+
+---
+
+## `openrouter_cheap_models.py`
+
+Fetches models from OpenRouter API and filters cheap/free ones. Results are segmented by modality.
+
+**Data sources:**
+- Text models: `https://openrouter.ai/api/v1/models`
+- Embedding models: `https://openrouter.ai/api/v1/embeddings/models`
+- Transcription models: `https://openrouter.ai/api/v1/models?output_modalities=transcription`
+
+**What it does:**
+- Lists text, embedding, and transcription models with pricing
+- Handles per-token pricing (text/embedding) and per-second pricing (audio/transcription)
+- Filters by price range (min/max)
+- Free models and negative prices (variable pricing) are handled specially
+
+### Examples
+
+```bash
+# List models under $0.03/1M tokens
 python openrouter_cheap_models.py
 
-# Custom threshold
-python openrouter_cheap_models.py --threshold 0.05
+# Only free models
+python openrouter_cheap_models.py --threshold 0.00
 
-# Price range
+# Models between $0.01 and $0.10/1M
 python openrouter_cheap_models.py --min 0.01 --max 0.10
 
 # JSON output
 python openrouter_cheap_models.py --output json
 ```
 
-**Flags:**
+### Flags
 
 | Flag | Description | Default |
 |------|-------------|---------|
-| `--threshold` | Max $/1M tokens | 0.03 |
-| `--min` | Min $/1M tokens (optional) | None |
-| `--max` | Max $/1M tokens (overrides threshold) | None |
-| `--output` | Output format: `table`, `json` | table |
+| `--threshold` | Max price ($/1M tokens) | `0.03` |
+| `--min` | Min price ($/1M tokens) | — |
+| `--max` | Max price ($/1M tokens, overrides `--threshold`) | — |
+| `--output` | Format: `table`, `json` | `table` |
 
 ---
 
 ## Setup
 
 ```bash
-# Create virtual environment
 python3 -m venv .venv
 source .venv/bin/activate
-
-# Install dependencies
 pip install -r requirements.txt
 ```
 
@@ -114,11 +125,7 @@ pip install -r requirements.txt
 
 ## Data
 
-`opencode_prices.json` contains scraped pricing data from OpenCode docs. Update it with:
-
-```bash
-python opencode_price_estimator.py --update-prices
-```
+`opencode_prices.json` is auto-generated by `opencode_price_estimator.py --update-prices`. It contains scraped pricing with source tags (`zen`, `go`, `both`) and context lengths.
 
 ## License
 
